@@ -1,0 +1,7 @@
+pa3-grading.pl
+*.o
+grading/
+lexer
+parser
+semant
+cgen
