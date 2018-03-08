@@ -11,7 +11,7 @@
 
 #include "tree.h"
 #include "cool-tree.handcode.h"
-
+#include "symtab.h"
 
 // define the class for phylum
 // define simple phylum - Program
@@ -35,6 +35,9 @@ class Class__class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Class_(); }
    virtual Class_ copy_Class_() = 0;
+   virtual Symbol get_name() = 0;
+   virtual void fill_table(class_list_type*) = 0;
+   virtual void semant_call(class_list_type*) = 0;
 
 #ifdef Class__EXTRAS
    Class__EXTRAS
@@ -83,7 +86,6 @@ public:
 #endif
 };
 
-
 // define simple phylum - Case
 typedef class Case_class *Case;
 
@@ -91,7 +93,7 @@ class Case_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Case(); }
    virtual Case copy_Case() = 0;
-
+   virtual Symbol get_expr() = 0;
 #ifdef Case_EXTRAS
    Case_EXTRAS
 #endif
@@ -144,14 +146,16 @@ public:
 #endif
 };
 
-
 // define constructor - class_
 class class__class : public Class__class {
-protected:
+public:
    Symbol name;
    Symbol parent;
    Features features;
    Symbol filename;
+   attr_list_type *attr_list;
+   method_list_type *method_list;
+   
 public:
    class__class(Symbol a1, Symbol a2, Features a3, Symbol a4) {
       name = a1;
@@ -159,8 +163,26 @@ public:
       features = a3;
       filename = a4;
    }
+   Symbol get_name() {
+       return name;
+   }
+   void fill_table(class_list_type* class_list);
+   void semant_call(class_list_type* class_list);
+   Symbol get_parent()
+   {
+       return parent;
+   }
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
+
+   attr_list_type *get_attr()
+   {
+       return attr_list;
+   }
+   method_list_type *get_methods()
+   {
+       return method_list;
+   }
 
 #ifdef Class__SHARED_EXTRAS
    Class__SHARED_EXTRAS
@@ -177,6 +199,7 @@ protected:
    Symbol name;
    Formals formals;
    Symbol return_type;
+   Symbol type;
    Expression expr;
 public:
    method_class(Symbol a1, Formals a2, Symbol a3, Expression a4) {
@@ -184,9 +207,14 @@ public:
       formals = a2;
       return_type = a3;
       expr = a4;
+      type = return_type;
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+   Formals get_formals()
+   {
+       return formals;
+   };
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
@@ -203,11 +231,13 @@ protected:
    Symbol name;
    Symbol type_decl;
    Expression init;
+   Symbol type;
 public:
    attr_class(Symbol a1, Symbol a2, Expression a3) {
       name = a1;
       type_decl = a2;
       init = a3;
+      type = type_decl;
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
@@ -248,6 +278,7 @@ class branch_class : public Case_class {
 protected:
    Symbol name;
    Symbol type_decl;
+   Symbol type;
    Expression expr;
 public:
    branch_class(Symbol a1, Symbol a2, Expression a3) {
@@ -257,6 +288,7 @@ public:
    }
    Case copy_Case();
    void dump(ostream& stream, int n);
+   Symbol get_expr() {return expr->get_type();};
 
 #ifdef Case_SHARED_EXTRAS
    Case_SHARED_EXTRAS

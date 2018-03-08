@@ -10,6 +10,7 @@
 #include "tree.h"
 #include "cool-tree.handcode.h"
 #include "cool-tree.h"
+#include "symtab.h"
 
 
 // constructors' functions
@@ -40,7 +41,6 @@ void class__class::dump(ostream& stream, int n)
    features->dump(stream, n+2);
    dump_Symbol(stream, n+2, filename);
 }
-
 
 Feature method_class::copy_Feature()
 {
