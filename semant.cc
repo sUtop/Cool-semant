@@ -186,14 +186,7 @@ void class__class::fill_table(class_list_type* class_list) {
     for (int i = features->first(); features->more(i); i = features->next(i)) {
         Feature feature = features->nth(i);
         if (dynamic_cast<method_class*> (feature) != NULL) {
-            //           DUMP curent->get_name() << "\n";
-            //           Symbol name = (dynamic_cast<method_class*>(feature))->get_name();
-            //            if (find_method(class_list,curent->get_name(),name) !=  NULL)
-            {
-                //                handler->semant_error(curent->get_filename(),this) << " Method" <<
-                //                    name <<"is an attribute of an inherited class.\n";
-                //                return;
-            }
+            // Fill method list in class.
             method_list->addid(feature->get_name(), feature);
         }
         if (dynamic_cast<attr_class*> (feature) != NULL) {
@@ -223,7 +216,7 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
     for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
         Class_ class_ = classes->nth(i);
         curent = class_;
-        // Fill class table
+        // Error example
         if (class_list->lookup(class_->get_name()) != NULL || class_->get_name() == SELF_TYPE) {
             semant_error(class_) << " Redefinition class " <<
                 class_->get_name() << "\n";
@@ -231,8 +224,8 @@ ClassTable::ClassTable(Classes classes) : semant_errors(0), error_stream(cerr) {
         }
         class_list->addid(class_->get_name(), class_);
 
-        class_->fill_table(class_list);
         // Fill environment-class
+        class_->fill_table(class_list);
     }
     if (class_list->lookup(Main) == NULL) {
         semant_error() << "Class Main is not defined.\n";
@@ -271,7 +264,6 @@ void class__class::semant_call(class_list_type* class_list) {
 void ClassTable::install_basic_classes() {
 
     // The tree package uses these globals to annotate the classes built below.
-    // Пакет дерева использует эти глобальные переменные для аннотирования классов, построенных ниже.
     // curr_lineno  = 0;
     Symbol filename = stringtable.add_string("<basic class>");
 
@@ -358,9 +350,11 @@ void ClassTable::install_basic_classes() {
                                                       no_expr()))),
                filename);
 
-
+    // current - is pointer to current class node
     curent = Object_class;
+    // For default classes - need fill table of attributes.
     Object_class->fill_table(class_list);
+    // Add id to Class list.
     class_list->addid(Object_class->get_name(), Object_class);
     curent = IO_class;
     IO_class->fill_table(class_list);
@@ -424,9 +418,7 @@ void program_class::semant() {
     /* ClassTable constructor may do some semantic analysis */
     ClassTable *classtable = new ClassTable(classes);
 
-
-    /* some semantic analysis code may go here */
-
+    // Global error of semant analisys
     if (classtable->errors()) {
         cerr << "Compilation halted due to static semantic errors." << endl;
         exit(1);
@@ -441,11 +433,15 @@ void class__class::semant(class_list_type *class_list, attr_list_type* attr_list
        Symbol filename;
 
      */
+    // Full fill example of usage:
+    // Dump calls, need if program fall
     DUMP "class__class \n";
     for (int i = features->first(); features->more(i); i = features->next(i)) {
         Feature f = features->nth(i);
+        // 
         f->semant(class_list, attr_list, method_list);
     }
+    // Print of semant error (parent filled but not exist):
     if (class_list->lookup(parent) == NULL) {
         handler->semant_error(curent->get_filename(), this) << "Class " << name <<
             "﻿inherits from an undefined class " << parent << "\n";
@@ -462,59 +458,17 @@ void method_class::semant(class_list_type *class_list, attr_list_type* attr_list
        Expression expr;
      */
     DUMP "method_class \n";
-    attr_list->enterscope();
+    // set for contain all formals (need for check).
     std::set<Symbol> formal_list;
     for (int i = formals->first(); formals->more(i); i = formals->next(i)) {
         Formal f = formals->nth(i);
         f->semant(class_list, attr_list, method);
-        if (formal_list.find(f->get_name()) != formal_list.end()) {
-            handler->semant_error(curent->get_filename(), this) <<
-                "﻿Formal parameter " << f->get_name() <<
-                " ﻿is multiply defined. \n";
-            return;
-        }
+
         formal_list.insert(f->get_name());
-        attr_list->addid(f->get_name(), f);
+
     }
     expr->semant(class_list, attr_list, method);
-    if (class_list->lookup(return_type) == NULL && !(return_type == SELF_TYPE && expr->get_type() == SELF_TYPE)) {
-        handler->semant_error(curent->get_filename(), this) << "Undefined return type " << return_type
-            << " in method " << name << " expected  " << expr->get_type() << "\n";
-        return;
-    }
-    if ((lub(class_list, return_type, expr->get_type()) == expr->get_type()) &&
-        (return_type != expr->get_type())) {
-        handler->semant_error(curent->get_filename(), this) <<
-            "﻿Inferred return type " << return_type <<
-            " ﻿of method " << name << " does not conform to declared return type " << expr->get_type() << "\n";
-        return;
-    }
-    // TODO FIXME find all parents and match arguments
 
-    tree_node* node = find_method(class_list, curent->get_parent(), name);
-    if (node != NULL && dynamic_cast<method_class*> (node)) {
-        method_class* last_method = dynamic_cast<method_class*> (node);
-        Formals fmls = last_method->get_formals();
-        for (int i = fmls->first(); fmls->more(i); i = fmls->next(i)) {
-            Formal orig = fmls->nth(i);
-            if (!formals->more(i)) {
-                handler->semant_error(curent->get_filename(), this) << " wrong number of formals \n";
-                return;
-            }
-            Formal test = formals->nth(i);
-            if (orig->get_type() != test->get_type()) {
-                handler->semant_error(curent->get_filename(), this) << " Different calls \n";
-                return;
-            }
-        }
-        for (int i = formals->first(); formals->more(i); i = formals->next(i)) {
-            if (!fmls->more(i)) {
-                handler->semant_error(curent->get_filename(), this) << " wrong number of formals \n";
-                return;
-            }
-        }
-    }
-    attr_list->exitscope();
 }
 
 void attr_class::semant(class_list_type *class_list, attr_list_type* attr_list, method_list_type* method) {
@@ -525,12 +479,7 @@ void attr_class::semant(class_list_type *class_list, attr_list_type* attr_list, 
      */
     DUMP "attr_class \n";
     init->semant(class_list, attr_list, method);
-    if (name == self) {
-        handler->semant_error(curent->get_filename(), this) << " attr_class != self \n";
-        return;
-    }
-    //attr_class* find_attr(class_list_type *class_list, Symbol A, Symbol attr)
-    //    attr_list->addid(name,this);
+
 }
 
 void formal_class::semant(class_list_type *class_list, attr_list_type* attr_list, method_list_type* method) {
@@ -539,17 +488,8 @@ void formal_class::semant(class_list_type *class_list, attr_list_type* attr_list
    Symbol type_decl;
      */
     DUMP "formal_class \n";
-    //    attr_list->addid(name,this);
-    if (type_decl == SELF_TYPE) {
-        handler->semant_error(curent->get_filename(), this) << " Formal parameter can't has SELF_TYPE \n";
-        return;
-    }
 
-    if (name == self) {
-        handler->semant_error(curent->get_filename(), this) << " Formal parameter can't be self \n";
-        return;
-    }
-
+    // no need semant analisys, but need add to attr list and check it!
 }
 
 void branch_class::semant(class_list_type *class_list, attr_list_type* attr_list, method_list_type* method) {
@@ -560,11 +500,9 @@ void branch_class::semant(class_list_type *class_list, attr_list_type* attr_list
      */
 
     DUMP "branch_class \n";
-    type = type_decl;
     attr_list->addid(name, this);
     expr->semant(class_list, attr_list, method);
     type = type_decl;
-    //    type = lub(class_list, type_decl, expr->get_type());
 }
 
 Symbol branch_class::get_type() {
@@ -578,19 +516,7 @@ void assign_class::semant(class_list_type *class_list, attr_list_type* attr_list
      */
     DUMP "assign_class \n";
     expr->semant(class_list, attr_list, method);
-    if (attr_list->lookup(name) != NULL &&
-        attr_list->lookup(name)->get_type() != expr->get_type() &&
-        expr->get_type() != SELF_TYPE) {
-        handler->semant_error(curent->get_filename(), this) << " assign != name  val named" << name <<
-            " type: " << attr_list->lookup(name)->get_type() <<
-            "  assigned to : " << expr->get_type() << "\n";
-        return;
-    }
-    if (name == self) {
-        handler->semant_error(curent->get_filename(), this) <<
-            " Can't assign to self \n";
-        return;
-    }
+
     type = expr->get_type();
 }
 
@@ -602,15 +528,15 @@ void static_dispatch_class::semant(class_list_type *class_list, attr_list_type* 
        Expressions actual;
      */
     DUMP "static_dispatch_class \n";
-    attr_list->enterscope();
+
     for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
         Expression f = actual->nth(i);
         f->semant(class_list, attr_list, method);
-        attr_list->addid(f->get_name(), f);
+
     }
     expr->semant(class_list, attr_list, method);
-    attr_list->exitscope();
 
+    // Lookup for method node
     tree_node *node = find_method(class_list, type_name, name);
 
     if (lub(class_list, type_name, curent->get_name()) == curent->get_name()) {
@@ -618,29 +544,10 @@ void static_dispatch_class::semant(class_list_type *class_list, attr_list_type* 
             " method  tested :" << type_name << " orig :" << curent->get_name() << "\n";
         return;
     }
-    if (lub(class_list, expr->get_type(), type_name) == Object) {
-        handler->semant_error(curent->get_filename(), this) << "Expression type " << expr->get_type() <<
-            " does not conform to declared static dispatch type :" << type_name << "\n";
-        return;
-    }
 
-    // check for types of arguments
+    // Here need check for types of arguments
     method_class* method_ = dynamic_cast<method_class*> (node);
-    for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
-        Formal orig = method_->get_formals()->nth(i);
-        Expression test = actual->nth(i);
-        if (test->get_type() != orig->get_type() &&
-            (test->get_type() != SELF_TYPE) &&
-            (lub(class_list, test->get_type(), orig->get_type()) == Object)
-            ) {
-            handler->semant_error(curent->get_filename(), this) << " ﻿Wrong call for " << name <<
-                " method  tested :" << test->get_type() << " orig :" << orig->get_type() << "\n";
-            return;
-        }
-    }
 
-
-    //expr = Int;
     type = node->get_type();
 }
 
@@ -651,35 +558,25 @@ void dispatch_class::semant(class_list_type *class_list, attr_list_type* attr_li
        Expressions actual;
      */
     DUMP "dispatch_class \n";
-    attr_list->enterscope();
 
     for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
         Expression f = actual->nth(i);
         f->semant(class_list, attr_list, method);
-        attr_list->addid(f->get_name(), f);
+
     }
     expr->semant(class_list, attr_list, method);
-    attr_list->exitscope();
 
     DUMP "dispatch_class finish semant \n";
     Symbol class_type = expr->get_type();
     tree_node *node;
     Class__class *call_class = curent;
-    //    std::cout << " > " << class_type->get_string() <<"\n";
-    if (class_type == SELF_TYPE) {
-        node = method->lookup(name);
-    } else {
-        call_class = class_list->lookup(class_type);
-        DUMP "dispatch_class get methods \n";
-    }
 
+    // Lookup for return type
     method_list_type * methods_ = call_class->get_methods();
     node = methods_->lookup(name);
-    if (node == NULL)
-        node = find_method(class_list, call_class->get_name(), name);
+    // Lookup in parent classes :
     if (node == NULL) {
-        handler->semant_error(curent->get_filename(), this) << " Dispatch to undefined method  " << name << "\n";
-        return;
+        node = find_method(class_list, call_class->get_name(), name);
     }
 
     if (class_type == SELF_TYPE && node->get_type() == SELF_TYPE) {
@@ -692,24 +589,6 @@ void dispatch_class::semant(class_list_type *class_list, attr_list_type* attr_li
     }
 
     // check for types of arguments
-    method_class* method_ = dynamic_cast<method_class*> (node);
-    for (int i = actual->first(); actual->more(i); i = actual->next(i)) {
-        Formal orig = method_->get_formals()->nth(i);
-        Expression test = actual->nth(i);
-        Symbol orig_type = orig->get_type();
-        Symbol test_type = test->get_type();
-        if (test_type == SELF_TYPE) {
-            test_type = curent->get_name();
-        }
-        Symbol lub_type = lub(class_list, test_type, orig_type);
-        //        std::cout << " In type " << type <<" test " << test_type << " orig " << orig_type << " lub_type " << lub_type << "\n";
-        if ((test_type != orig_type) &&
-            (lub_type == test_type)) {
-            handler->semant_error(curent->get_filename(), this) << " ﻿Wrong call for " << name <<
-                " method  tested :" << test->get_type() << " orig :" << orig->get_type() << "\n";
-            return;
-        }
-    }
 
 }
 
@@ -723,6 +602,7 @@ void cond_class::semant(class_list_type *class_list, attr_list_type* attr_list, 
     pred->semant(class_list, attr_list, method);
     then_exp->semant(class_list, attr_list, method);
     else_exp->semant(class_list, attr_list, method);
+    // Example of lub call
     type = lub(class_list, then_exp->get_type(), else_exp->get_type());
 }
 
@@ -734,11 +614,6 @@ void loop_class::semant(class_list_type *class_list, attr_list_type* attr_list, 
     DUMP "loop_class \n";
     pred->semant(class_list, attr_list, method);
     body->semant(class_list, attr_list, method);
-    if (pred->get_type() != Bool) {
-        handler->semant_error(curent->get_filename(), this)
-            << "Loop condition does not have type Bool.\n";
-        return;
-    }
     type = Object;
 }
 
@@ -746,42 +621,35 @@ void typcase_class::semant(class_list_type *class_list, attr_list_type* attr_lis
     /*
        Expression expr;
        Cases cases;
-         Symbol type;
+       Symbol type;
      */
     DUMP "typcase_class \n";
     Symbol last_type = NULL;
     expr->semant(class_list, attr_list, method);
+    // List of all types
     std::set<Symbol> full;
-    //    std::cerr << " In class  " << curent->get_name() << " \n";
 
     for (int i = cases->first(); cases->more(i); i = cases->next(i)) {
         Case f = cases->nth(i);
         DUMP "typcase_class call semant for  \n";
-        //        f->dump(std::cout,2);
+
         f->semant(class_list, attr_list, method);
-        if (full.find(f->get_type()) != full.end()) {
-            handler->semant_error(curent->get_filename(), this)
-                << "Duplicate branch " << f->get_type()
-                << "﻿in case statement.\n";
-            return;
-        }
+
         full.insert(f->get_type());
         /// > GET EXPRESION RETURN TYPE <
+        /// !!! (here not f->get_type())
+        /// May be bug ?
         Symbol test_type = f->get_expr();
         if (test_type == SELF_TYPE) {
-            //            test_type = curent->get_name();
             continue;
         }
         if (last_type != NULL) {
-            //            std::cerr << " call lub for " << last_type << " and " << test_type << " \n";
             last_type = lub(class_list, last_type, test_type);
         } else {
-            //            std::cerr << " first type " << test_type << "\n";
             last_type = test_type;
         }
     }
     type = last_type;
-    //    std::cerr << " Final class " << type << "\n";
 }
 
 void block_class::semant(class_list_type *class_list, attr_list_type* attr_list, method_list_type* method) {
@@ -804,27 +672,12 @@ void let_class::semant(class_list_type *class_list, attr_list_type* attr_list, m
        Expression body;
      */
     DUMP "let_class \n";
-    if (identifier == self) {
-        handler->semant_error(curent->get_filename(), this) << "'" << identifier
-            << "' cannot be bound in a 'let' expression.\n";
-        return;
-    }
-    attr_list->enterscope();
-    attr_list->addid(identifier, this);
+
     type = type_decl;
     init->semant(class_list, attr_list, method);
     body->semant(class_list, attr_list, method);
 
-    if ((lub(class_list, init->get_type(), type_decl) == init->get_type()) &&
-        init->get_type() != type_decl) {
-        handler->semant_error(curent->get_filename(), this) << "﻿Inferred type " << init->get_type() <<
-            " ﻿of initialization of " << identifier << " does not conform to identifier's declared type "
-            << type_decl << "\n";
-        return;
-    }
-
     type = body->get_type();
-    attr_list->exitscope();
 }
 
 void plus_class::semant(class_list_type *class_list, attr_list_type* attr_list, method_list_type* method) {
@@ -835,11 +688,6 @@ void plus_class::semant(class_list_type *class_list, attr_list_type* attr_list, 
     DUMP "plus_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if (e1->get_type() != Int || e2->get_type() != Int) {
-        handler->semant_error(curent->get_filename(), this) << " non-Int arguments for plus: " <<
-            e1->get_type() << "+" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Int;
 }
@@ -848,11 +696,6 @@ void sub_class::semant(class_list_type *class_list, attr_list_type* attr_list, m
     DUMP "sub_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if (e1->get_type() != Int || e2->get_type() != Int) {
-        handler->semant_error(curent->get_filename(), this) << " non-Int arguments for plus: " <<
-            e1->get_type() << "+" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Int;
 }
@@ -861,11 +704,6 @@ void mul_class::semant(class_list_type *class_list, attr_list_type* attr_list, m
     DUMP "mul_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if (e1->get_type() != Int || e2->get_type() != Int) {
-        handler->semant_error(curent->get_filename(), this) << " non-Int arguments for plus: " <<
-            e1->get_type() << "+" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Int;
 }
@@ -874,11 +712,6 @@ void divide_class::semant(class_list_type *class_list, attr_list_type* attr_list
     DUMP "divide_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if (e1->get_type() != Int || e2->get_type() != Int) {
-        handler->semant_error(curent->get_filename(), this) << " non-Int arguments for plus: " <<
-            e1->get_type() << "+" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Int;
 }
@@ -893,11 +726,6 @@ void lt_class::semant(class_list_type *class_list, attr_list_type* attr_list, me
     DUMP "lt_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if (e1->get_type() != Int || e2->get_type() != Int) {
-        handler->semant_error(curent->get_filename(), this) << " non-Int arguments for plus: " <<
-            e1->get_type() << "+" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Bool;
 }
@@ -907,12 +735,6 @@ void eq_class::semant(class_list_type *class_list, attr_list_type* attr_list, me
     DUMP "eq_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if ((e1->get_type() == Int || e1->get_type() == Str || e1->get_type() == Bool) &&
-        (e2->get_type() != e1->get_type())) {
-        handler->semant_error(curent->get_filename(), this) << " Illegal arguments for bool: " <<
-            e1->get_type() << "=" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Bool;
 }
@@ -925,11 +747,6 @@ void leq_class::semant(class_list_type *class_list, attr_list_type* attr_list, m
     DUMP "leq_class \n";
     e1->semant(class_list, attr_list, method);
     e2->semant(class_list, attr_list, method);
-    if (e1->get_type() != Int || e2->get_type() != Int) {
-        handler->semant_error(curent->get_filename(), this) << " non-Int arguments for plus: " <<
-            e1->get_type() << "+" << e2->get_type() << "\n";
-        return;
-    }
 
     type = Bool;
 }
@@ -966,11 +783,6 @@ void new__class::semant(class_list_type *class_list, attr_list_type* attr_list, 
     DUMP "new__class \n";
     type = type_name;
 
-    if (class_list->lookup(type_name) == NULL && type_name != SELF_TYPE) {
-        handler->semant_error(curent->get_filename(), this) << "'new' used with undefined class " << type_name << "\n";
-        return;
-    }
-
 }
 
 void isvoid_class::semant(class_list_type *class_list, attr_list_type* attr_list, method_list_type* method) {
@@ -1003,11 +815,6 @@ void object_class::semant(class_list_type *class_list, attr_list_type* attr_list
         } else {
             DUMP "object_class + find\n";
             tree_node *node = find_attr(class_list, curent->get_name(), name);
-            //attr_list->lookup(name);
-            if (node == NULL) {
-                handler->semant_error(curent->get_filename(), this) << " ﻿Undeclared identifier " << name << "\n";
-                return;
-            }
             type = node->get_type();
         }
     }
